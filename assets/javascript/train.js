@@ -20,78 +20,121 @@ var minutesAway;
 var currentTime;
 var tableTd;
 var tableTr;
-var hourFormat;
 
-// checks current time with first train time with moment.js
-var timeCheck = function() {
-	var hourFormat = "h:mm";
-	var convertedFirstTrainTimeForm = moment(firstTrainTimeForm).format(hourFormat);
-	var convertedFrequencyForm = moment(frequencyForm).format("mm");
-	var currentTime = moment().format(hourFormat);
 
-	if (currentTime < convertedFirstTrainTimeForm) {
-		var nextArrival = convertedFirstTrainTimeForm;
-	}
-	else if (currentTime == convertedFirstTrainTimeForm) {
-		var nextArrival = "Train is here";
-	}
-	else if (currentTime > convertedFirstTrainTimeForm) {
-		while (currentTime > convertedFirstTrainTimeForm) {
-			convertedFirstTrainTimeForm.add(convertedFrequencyForm, "minutes").calendar
-			var nextArrival = convertedFirstTrainTimeForm;
-		}
-	}
-	var minutesAway = currentTime.diff(nextArrival, "minutes");
 
-};
 
 // gets user forms and gives them to firebase
-var formToFirebase = function() {
+$("#submit").on("click", function() {
 	event.preventDefault();
 	// get values from user inputed forms
 	trainForm = $("#train-form").val().trim();
 	destinationForm = $("#destination-form").val().trim();
 	firstTrainTimeForm = $("#first-train-time-form").val().trim();
 	frequencyForm = $("#frequency-form").val().trim();
-	timeCheck();
-	// Change what is saved in firebase
+	// checks current time with first train time with moment.js
+	var currentTime = moment();
+	
+	var convertedFirstTrainTimeForm = moment(firstTrainTimeForm, "HH:mm");
+	
+	
+	
+	var timeDifferent = moment().diff(moment(convertedFirstTrainTimeForm), "minutes");
+	// if loop to determine if the first train arrival is after the current time
+	if (timeDifferent > 0) {
+		var remainder = timeDifferent % frequencyForm;
+		var minutesAway = frequencyForm - remainder;
+		debugger;
+		var nextArrival = moment().add(minutesAway, "minutes").format("HH:mm");
+		debugger;
+	}
+	else {
+		nextArrival = convertedFirstTrainTimeForm.format("HH:mm");
+		minutesAway = timeDifferent * -1;
+	}	
+
     database.ref().push ({
-    	trainForm: trainForm,
-        destinationForm: destinationForm,
-        frequencyForm: frequencyForm,
-        nextArrival: nextArrival,
-        minutesAway: minutesAway
+    	trainFormRef: trainForm,
+        destinationFormRef: destinationForm,
+        frequencyFormRef: frequencyForm,
+        nextArrivalRef: nextArrival,
+        minutesAwayRef: minutesAway
     });
-};
+    // var postId = database.ref().push().key;
+});
+
+
+var update = function () {
+	var currentTime = moment();
+
+	var convertedFirstTrainTimeForm = moment(firstTrainTimeForm, "HH:mm");
+
+	var timeDifferent = moment().diff(moment(convertedFirstTrainTimeForm), "minutes");
+	// if loop to determine if the first train arrival is after the current time
+	if (timeDifferent > 0) {
+		var remainder = timeDifferent % frequencyForm;
+		var minutesAway = frequencyForm - remainder;
+		debugger;
+		var nextArrival = moment().add(minutesAway, "minutes").format("HH:mm");
+		debugger;
+	}
+	else {
+		nextArrival = convertedFirstTrainTimeForm.format("HH:mm");
+		minutesAway = timeDifferent * -1;
+	}
+	database.ref().update({
+		nextArrivalRef: nextArrival,
+		minutesAwayRef: minutesAway
+	})	
+	
+}
+
 
 // dynamically creates tables
-var tableCreator = function(childSnapshot) {
-	trainForm = childSnapshot.val().trainForm;
-    destinationForm = childSnapshot.val().destinationForm;
-    frequencyForm = childSnapshot.val().frequencyForm;
-    nextArrival = childSnapshot.val().nextArrival;
-    minutesAway = childSnapshot.val().minutesAway;
+database.ref().on("child_added", function(childSnapshot) {
+	debugger;
 
+	trainForm = childSnapshot.val().trainFormRef;
+    destinationForm = childSnapshot.val().destinationFormRef;
+    frequencyForm = childSnapshot.val().frequencyFormRef;
+    nextArrival = childSnapshot.val().nextArrivalRef;
+    minutesAway = childSnapshot.val().minutesAwayRef;
+    keyId = childSnapshot.key;
     
-	
+  
+	// to make a new row for when data is submitted
 	tableTr = $("<tr>");
 	tableTr.append("<td>" + trainForm + "</td>");
     tableTr.append("<td>" + destinationForm + "</td>");
     tableTr.append("<td>" + frequencyForm + "</td>");
-    tableTr.append("<td>" + monthsWorked + "</td>");
     tableTr.append("<td>" + nextArrival + "</td>");
     tableTr.append("<td>" + minutesAway + "</td>");
 	
 	
 	$("#train-table").append(tableTr);
 
-}, 
-// function(errorObject) {
-//       console.log("The read failed: " + errorObject.code);
-// }
+	timerFunc = setInterval(update, 60000);
 
-// take text in forms and sends it to firebase
-$("#submit").on("click", formToFirebase);
+}), 
+function(errorObject) {
+      console.log("The read failed: " + errorObject.code);
+}
 
-// when database has new values, create tables accordingly
-database.ref().on("child_added", tableCreator);
+database.ref().on("child_changed", function(childSnapshot) {
+	$("#train-table").empty();
+
+	// to make a new row for when data is submitted
+	tableTr = $("<tr>");
+	tableTr.append("<td>" + trainForm + "</td>");
+    tableTr.append("<td>" + destinationForm + "</td>");
+    tableTr.append("<td>" + frequencyForm + "</td>");
+    tableTr.append("<td>" + nextArrival + "</td>");
+    tableTr.append("<td>" + minutesAway + "</td>");
+	
+	
+	$("#train-table").append(tableTr);
+
+	timerFunc = setInterval(update, 60000);
+
+
+});
